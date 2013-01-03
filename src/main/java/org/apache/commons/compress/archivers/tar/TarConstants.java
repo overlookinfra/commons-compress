@@ -58,9 +58,20 @@ public interface TarConstants {
     int    GIDLEN = 8;
 
     /**
+     * The maximum value of gid/uid in a tar archive which can
+     * be expressed in octal char notation (that's 7 sevens, octal).
+     */
+    long    MAXID = 07777777L;
+ 
+    /**
      * The length of the checksum field in a header buffer.
      */
     int    CHKSUMLEN = 8;
+
+    /**
+     * Offset of the checksum field within header record.
+     */
+    int    CHKSUM_OFFSET = 148;
 
     /**
      * The length of the size field in a header buffer.
@@ -69,7 +80,8 @@ public interface TarConstants {
     int    SIZELEN = 12;
 
     /**
-     * The maximum size of a file in a tar archive (That's 11 sevens, octal).
+     * The maximum size of a file in a tar archive 
+     * which can be expressed in octal char notation (that's 11 sevens, octal).
      */
     long   MAXSIZE = 077777777777L;
 
@@ -226,7 +238,7 @@ public interface TarConstants {
 
     /**
      * Sparse file type.
-     * @since Apache Commons Compress 1.1.1
+     * @since 1.1.1
      */
     byte LF_GNUTYPE_SPARSE = (byte) 'S';
 
@@ -234,24 +246,24 @@ public interface TarConstants {
 
     /**
      * Identifies the entry as a Pax extended header.
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     byte LF_PAX_EXTENDED_HEADER_LC = (byte) 'x';
 
     /**
      * Identifies the entry as a Pax extended header (SunOS tar -E).
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     byte LF_PAX_EXTENDED_HEADER_UC = (byte) 'X';
-    
+
     /**
      * Identifies the entry as a Pax global extended header.
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     byte LF_PAX_GLOBAL_EXTENDED_HEADER = (byte) 'g';
-    
+
     /**
      * The magic tag representing a POSIX tar archive.
      */
@@ -269,14 +281,14 @@ public interface TarConstants {
     /**
      * The magic tag representing an Ant tar archive.
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     String MAGIC_ANT = "ustar\0";
-    
+
     /**
      * The "version" representing an Ant tar archive.
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     // Does not appear to have a version, however Ant does write 8 bytes,
     // so assume the version is 2 nulls

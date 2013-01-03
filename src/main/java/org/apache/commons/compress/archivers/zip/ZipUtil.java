@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
 
 /**
  * Utility class for handling DOS and Java time conversions.
@@ -208,8 +209,8 @@ public abstract class ZipUtil {
      * @return true if the compression method is STORED or DEFLATED
      */
     private static boolean supportsMethodOf(ZipArchiveEntry entry) {
-        return entry.getMethod() == ZipArchiveEntry.STORED
-            || entry.getMethod() == ZipArchiveEntry.DEFLATED;
+        return entry.getMethod() == ZipEntry.STORED
+            || entry.getMethod() == ZipEntry.DEFLATED;
     }
 
     /**
@@ -224,9 +225,14 @@ public abstract class ZipUtil {
                                                    .Feature.ENCRYPTION, ze);
         }
         if (!supportsMethodOf(ze)) {
-            throw
-                new UnsupportedZipFeatureException(UnsupportedZipFeatureException
-                                                   .Feature.METHOD, ze);
+            ZipMethod m = ZipMethod.getMethodByCode(ze.getMethod());
+            if (m == null) {
+                throw
+                    new UnsupportedZipFeatureException(UnsupportedZipFeatureException
+                                                       .Feature.METHOD, ze);
+            } else {
+                throw new UnsupportedZipFeatureException(m, ze);
+            }
         }
     }
 }

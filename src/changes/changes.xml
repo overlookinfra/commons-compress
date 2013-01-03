@@ -32,9 +32,7 @@ SVN commits. TBA how to use this with SVN.
 
 To generate the release notes from this file:
 
-mvn changes:announcement-generate -Prelnotes
-mv target/announcement/release-notes.vm RELEASE-NOTES.txt
-then tweak the formatting if necessary and commit
+mvn changes:announcement-generate -Prelease-notes [-Dchanges.version=m.n]
 
 The <action> type attribute can be add,update,fix,remove.
 -->
@@ -44,8 +42,121 @@ The <action> type attribute can be add,update,fix,remove.
     <title>commons-compress</title>
   </properties>
   <body>
-    <release version="1.4" date="unreleased"
+    <release version="1.5" date="not released, yet"
+             description="Release 1.5">
+      <action type="update" date="2012-07-08" issue="COMPRESS-188"
+              due-to="Harald Kuhn">
+        Improved exception message if a zip archive cannot be read
+        because of an unsupported compression method.
+      </action>
+      <action type="update" date="2012-07-07" issue="COMPRESS-192"
+              due-to="Jukka Zitting">
+        ArchiveStreamFactory has a setting for file name encoding that
+        sets up encoding for ZIP and TAR streams.
+      </action>
+      <action type="fix" date="2012-07-07" issue="COMPRESS-191"
+              due-to="Jukka Zitting">
+        ArchiveStreamFactory's tar stream detection created false
+        positives for AIFF files.
+      </action>
+      <action type="update" date="2012-07-07" issue="COMPRESS-191"
+              due-to="Jukka Zitting">
+        TarArchiveEntry now has a method to verify its checksum.
+      </action>
+      <action type="fix" date="2012-12-27" issue="COMPRESS-199"
+              due-to="Jukka Zitting">
+        XZ for Java doesn't provide an OSGi bundle.  Compress'
+        dependency on it has now been marked optional so Compress
+        itself can still be used in an OSGi context.
+      </action>
+      <action type="fix" date="2012-12-27" issue="COMPRESS-200"
+              due-to="Christian Schlichtherle">
+        When specifying the encoding explicitly TarArchiveOutputStream
+        would write unreadable names in GNU mode or even cause errors
+        in POSIX mode for file names longer than 66 characters.
+      </action>
+      <action type="fix" date="2012-12-27" issue="COMPRESS-203">
+        Writing TAR PAX headers failed if the generated entry name
+        ended with a "/".
+      </action>
+      <action type="fix" date="2012-12-28" issue="COMPRESS-189"
+              due-to="Daniel Lowe">
+        ZipArchiveInputStream sometimes failed to provide input to the
+        Inflater when it needed it, leading to reads returning 0.
+      </action>
+      <action type="update" date="2013-01-01">
+        Split/spanned ZIP archives are now properly detected by
+        ArchiveStreamFactory but will cause an
+        UnsupportedZipFeatureException when read.
+      </action>
+      <action type="update" date="2013-01-01" issue="COMPRESS-208">
+        ZipArchiveInputStream now reads archives that start with a
+        "PK00" signature.  Archives with this signatures are created
+        when the archiver was willing to split the archive but in the
+        end only needed a single segment - so didn't split anything. 
+      </action>
+      <action type="update" date="2013-01-01" issue="COMPRESS-201">
+        TarArchiveEntry has a new constructor that allows setting
+        linkFlag and preserveLeadingSlashes at the same time.
+      </action>
+      <action type="update" date="2013-01-01" issue="COMPRESS-159">
+        ChangeSetPerformer has a new perform overload that uses a
+        ZipFile instance as input.
+      </action>
+    </release>
+    <release version="1.4.1" date="2012-05-23"
+             description="Release 1.4.1">
+      <action type="fix" date="2012-05-20">
+        Ported libbzip2's fallback sort algorithm to
+        BZip2CompressorOutputStream to speed up compression in certain
+        edge cases.
+
+        Using specially crafted inputs this can be used as a denial
+        of service attack.  See the security reports page for details.
+      </action>
+    </release>
+    <release version="1.4" date="2012-04-11"
              description="Release 1.4">
+      <action issue="COMPRESS-183" type="fix" date="2012-03-24">
+        The tar package now allows the encoding of file names to be
+        specified and can optionally use PAX extension headers to
+        write non-ASCII file names.
+        The stream classes now write (or expect to read) archives that
+        use the platform's native encoding for file names.  Apache
+        Commons Compress 1.3 used to strip everything but the lower
+        eight bits of each character which effectively only worked for
+        ASCII and ISO-8859-1 file names.
+        This new default behavior is a breaking change.
+      </action> 
+      <action issue="COMPRESS-184" type="fix" date="2012-03-23">
+        TarArchiveInputStream failed to parse PAX headers that
+        contained non-ASCII characters.
+      </action> 
+      <action issue="COMPRESS-182" type="update" date="2012-03-02">
+        The tar package can now write archives that use star/GNU/BSD
+        extensions or use the POSIX/PAX variant to store numeric
+        values that don't fit into the traditional header fields.
+      </action> 
+      <action issue="COMPRESS-181" type="update" date="2012-03-02">
+        Added a workaround for a Bug some tar implementations that add
+        a NUL byte as first byte in numeric header fields.
+      </action> 
+      <action issue="COMPRESS-176" type="update" date="2012-02-28">
+        Added a workaround for a Bug in WinZIP which uses backslashes
+        as path separators in Unicode Extra Fields.
+      </action> 
+      <action issue="COMPRESS-131" type="update" date="2012-02-23">
+        ArrayOutOfBounds while decompressing bz2. Added test case - code already seems to have been fixed.
+      </action> 
+      <action issue="COMPRESS-178" type="fix" date="2012-02-23">
+        TarArchiveInputStream throws IllegalArgumentException instead of IOException
+      </action> 
+      <action issue="COMPRESS-179" type="fix" date="2012-02-23">
+        TarUtils.formatLongOctalOrBinaryBytes() assumes the field will be 12 bytes long
+      </action> 
+      <action issue="COMPRESS-175" type="fix" date="2012-02-22">
+        GNU Tar sometimes uses binary encoding for UID and GID
+      </action> 
       <action issue="COMPRESS-171" type="fix" date="2012-01-29">
         ArchiveStreamFactory.createArchiveInputStream would claim
         short text files were TAR archives.

@@ -27,6 +27,7 @@ import java.io.PushbackInputStream;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 
 import org.apache.commons.compress.archivers.ArchiveEntry;
@@ -128,7 +129,16 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
     private static final long TWO_EXP_32 = ZIP64_MAGIC + 1;
 
     public ZipArchiveInputStream(InputStream inputStream) {
-        this(inputStream, ZipEncodingHelper.UTF8, true);
+        this(inputStream, ZipEncodingHelper.UTF8);
+    }
+
+    /**
+     * @param encoding the encoding to use for file names, use null
+     * for the platform's default encoding
+     * @since 1.5
+     */
+    public ZipArchiveInputStream(InputStream inputStream, String encoding) {
+        this(inputStream, encoding, true);
     }
 
     /**
@@ -150,7 +160,7 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
      * Extra Fields (if present) to set the file names.
      * @param allowStoredEntriesWithDataDescriptor whether the stream
      * will try to read STORED entries that use a data descriptor
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public ZipArchiveInputStream(InputStream inputStream,
                                  String encoding,
@@ -164,18 +174,30 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
     }
 
     public ZipArchiveEntry getNextZipEntry() throws IOException {
+        boolean firstEntry = true;
         if (closed || hitCentralDirectory) {
             return null;
         }
         if (current != null) {
             closeEntry();
+            firstEntry = false;
         }
+
         byte[] lfh = new byte[LFH_LEN];
         try {
-            readFully(lfh);
+            if (firstEntry) {
+                // split archives have a special signature before the
+                // first local file header - look for it and fail with
+                // the appropriate error message if this is a split
+                // archive.
+                readFirstLocalFileHeader(lfh);
+            } else {
+                readFully(lfh);
+            }
         } catch (EOFException e) {
             return null;
         }
+            
         ZipLong sig = new ZipLong(lfh);
         if (sig.equals(ZipLong.CFH_SIG)) {
             hitCentralDirectory = true;
@@ -248,6 +270,29 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
     }
 
     /**
+     * Fills the given array with the first local file header and
+     * deals with splitting/spanning markers that may prefix the first
+     * LFH.
+     */
+    private void readFirstLocalFileHeader(byte[] lfh) throws IOException {
+        readFully(lfh);
+        ZipLong sig = new ZipLong(lfh);
+        if (sig.equals(ZipLong.DD_SIG)) {
+            throw new 
+                UnsupportedZipFeatureException(UnsupportedZipFeatureException
+                                               .Feature.SPLITTING);
+        }
+        if (sig.equals(ZipLong.SINGLE_SEGMENT_SPLIT_MARKER)) {
+            // The archive is not really split as only one segment was
+            // needed in the end.  Just skip over the marker.
+            byte[] missedLfhBytes = new byte[4];
+            readFully(missedLfhBytes);
+            System.arraycopy(lfh, 4, lfh, 0, LFH_LEN - 4);
+            System.arraycopy(missedLfhBytes, 0, lfh, LFH_LEN - 4, 4);
+        }
+    }
+
+    /**
      * Records whether a Zip64 extra is present and sets the size
      * information from it if sizes are 0xFFFFFFFF and the entry
      * doesn't use a data descriptor.
@@ -283,7 +328,7 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
      *
      * <p>May return false if it is set up to use encryption or a
      * compression method that hasn't been implemented yet.</p>
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     @Override
     public boolean canReadEntryData(ArchiveEntry ae) {
@@ -370,26 +415,44 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
      */
     private int readDeflated(byte[] buffer, int start, int length)
         throws IOException {
-        if (inf.needsInput()) {
-            fill();
-            if (buf.lengthOfLastRead > 0) {
-                current.bytesReadFromStream += buf.lengthOfLastRead;
-            }
-        }
-        int read = 0;
-        try {
-            read = inf.inflate(buffer, start, length);
-        } catch (DataFormatException e) {
-            throw new ZipException(e.getMessage());
-        }
+        int read = readFromInflater(buffer, start, length);
         if (read == 0) {
             if (inf.finished()) {
                 return -1;
+            } else if (inf.needsDictionary()) {
+                throw new ZipException("This archive needs a preset dictionary"
+                                       + " which is not supported by Commons"
+                                       + " Compress.");
             } else if (buf.lengthOfLastRead == -1) {
                 throw new IOException("Truncated ZIP file");
             }
         }
         crc.update(buffer, start, read);
+        return read;
+    }
+
+    /**
+     * Potentially reads more bytes to fill the inflater's buffer and
+     * reads from it.
+     */
+    private int readFromInflater(byte[] buffer, int start, int length)
+        throws IOException {
+        int read = 0;
+        do {
+            if (inf.needsInput()) {
+                fill();
+                if (buf.lengthOfLastRead > 0) {
+                    current.bytesReadFromStream += buf.lengthOfLastRead;
+                } else {
+                    break;
+                }
+            }
+            try {
+                read = inf.inflate(buffer, start, length);
+            } catch (DataFormatException e) {
+                throw new ZipException(e.getMessage());
+            }
+        } while (read == 0 && inf.needsInput());
         return read;
     }
 
@@ -452,7 +515,10 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
         }
 
         return checksig(signature, ZipArchiveOutputStream.LFH_SIG) // normal file
-            || checksig(signature, ZipArchiveOutputStream.EOCD_SIG); // empty zip
+            || checksig(signature, ZipArchiveOutputStream.EOCD_SIG) // empty zip
+            || checksig(signature, ZipArchiveOutputStream.DD_SIG) // split zip
+            || checksig(signature,
+                        ZipLong.SINGLE_SEGMENT_SPLIT_MARKER.getBytes());
     }
 
     private static boolean checksig(byte[] signature, byte[] expected){
@@ -635,7 +701,7 @@ public class ZipArchiveInputStream extends ArchiveInputStream {
     private boolean supportsDataDescriptorFor(ZipArchiveEntry entry) {
         return allowStoredEntriesWithDataDescriptor ||
             !entry.getGeneralPurposeBit().usesDataDescriptor()
-            || entry.getMethod() == ZipArchiveEntry.DEFLATED;
+            || entry.getMethod() == ZipEntry.DEFLATED;
     }
 
     /**

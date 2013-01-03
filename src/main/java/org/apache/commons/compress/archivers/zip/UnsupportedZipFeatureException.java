@@ -29,7 +29,7 @@ public class UnsupportedZipFeatureException extends ZipException {
 
     private final Feature reason;
     private final ZipArchiveEntry entry;
-    private static final long serialVersionUID = 4430521921766595597L;
+    private static final long serialVersionUID = 20130101L;
 
     /**
      * Creates an exception.
@@ -42,6 +42,33 @@ public class UnsupportedZipFeatureException extends ZipException {
               + entry.getName());
         this.reason = reason;
         this.entry = entry;
+    }
+
+    /**
+     * Creates an exception for archives that use an unsupported
+     * compression algorithm.
+     * @param method the method that is not supported
+     * @param entry the entry using the feature
+     * @since 1.5
+     */
+    public UnsupportedZipFeatureException(ZipMethod method,
+                                          ZipArchiveEntry entry) {
+        super("unsupported feature method '" + method.name()
+              +  "' used in entry " + entry.getName());
+        this.reason = Feature.METHOD;
+        this.entry = entry;
+    }
+
+    /**
+     * Creates an exception when the whole archive uses an unsupported
+     * feature.
+     *
+     * @param reason the feature that is not supported
+     */
+    public UnsupportedZipFeatureException(Feature reason) {
+        super("unsupported feature " + reason +  " used in archive.");
+        this.reason = reason;
+        this.entry = null;
     }
 
     /**
@@ -75,7 +102,12 @@ public class UnsupportedZipFeatureException extends ZipException {
          * The entry uses a data descriptor.
          */
         public static final Feature DATA_DESCRIPTOR = new Feature("data descriptor");
-        
+        /**
+         * The archive uses splitting or spanning.
+         * @since 1.5
+         */
+        public static final Feature SPLITTING = new Feature("splitting");
+
         private final String name;
 
         private Feature(String name) {

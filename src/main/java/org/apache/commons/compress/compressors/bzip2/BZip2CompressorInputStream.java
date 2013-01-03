@@ -192,8 +192,9 @@ public class BZip2CompressorInputStream extends CompressorInputStream implements
         int nInUseShadow = 0;
 
         for (int i = 0; i < 256; i++) {
-            if (inUse[i])
+            if (inUse[i]) {
                 seqToUnseq[nInUseShadow++] = (byte) i;
+            }
         }
 
         this.nInUse = nInUseShadow;
@@ -244,15 +245,17 @@ public class BZip2CompressorInputStream extends CompressorInputStream implements
         }
 
         int magic0 = this.in.read();
+        if (magic0 == -1 && !isFirstStream) {
+            return false;
+        }
         int magic1 = this.in.read();
         int magic2 = this.in.read();
-        if (magic0 == -1 && !isFirstStream)
-            return false;
 
-        if (magic0 != 'B' || magic1 != 'Z' || magic2 != 'h')
+        if (magic0 != 'B' || magic1 != 'Z' || magic2 != 'h') {
             throw new IOException(isFirstStream
                     ? "Stream is not in the BZip2 format"
                     : "Garbage after a valid BZip2 stream");
+        }
 
         int blockSize = this.in.read();
         if ((blockSize < '1') || (blockSize > '9')) {
@@ -286,14 +289,16 @@ public class BZip2CompressorInputStream extends CompressorInputStream implements
 
             // If isn't end of stream magic, break out of the loop.
             if (magic0 != 0x17 || magic1 != 0x72 || magic2 != 0x45
-                    || magic3 != 0x38 || magic4 != 0x50 || magic5 != 0x90)
+                    || magic3 != 0x38 || magic4 != 0x50 || magic5 != 0x90) {
                 break;
+            }
 
             // End of stream was reached. Check the combined CRC and
             // advance to the next .bz2 stream if decoding concatenated
             // streams.
-            if (complete())
+            if (complete()) {
                 return;
+            }
         }
 
         if (magic0 != 0x31 || // '1'
@@ -1023,14 +1028,14 @@ public class BZip2CompressorInputStream extends CompressorInputStream implements
      *            the number of bytes to check
      * @return true, if this stream is a bzip2 compressed stream, false otherwise
      * 
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public static boolean matches(byte[] signature, int length) {
 
         if (length < 3) {
             return false;
         }
-        
+
         if (signature[0] != 'B') {
             return false;
         }
@@ -1042,7 +1047,7 @@ public class BZip2CompressorInputStream extends CompressorInputStream implements
         if (signature[2] != 'h') {
             return false;
         }
-        
+
         return true;
     }
 }

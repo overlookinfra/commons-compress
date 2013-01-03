@@ -18,6 +18,15 @@
  */
 package org.apache.commons.compress.archivers.tar;
 
+import static org.apache.commons.compress.archivers.tar.TarConstants.CHKSUMLEN;
+import static org.apache.commons.compress.archivers.tar.TarConstants.CHKSUM_OFFSET;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import org.apache.commons.compress.archivers.zip.ZipEncoding;
+import org.apache.commons.compress.archivers.zip.ZipEncodingHelper;
+
 /**
  * This class provides static utility methods to work with byte streams.
  *
@@ -28,19 +37,61 @@ public class TarUtils {
 
     private static final int BYTE_MASK = 255;
 
+    static final ZipEncoding DEFAULT_ENCODING =
+        ZipEncodingHelper.getZipEncoding(null);
+
+    /**
+     * Encapsulates the algorithms used up to Commons Compress 1.3 as
+     * ZipEncoding.
+     */
+    static final ZipEncoding FALLBACK_ENCODING = new ZipEncoding() {
+            public boolean canEncode(String name) { return true; }
+
+            public ByteBuffer encode(String name) {
+                final int length = name.length();
+                byte[] buf = new byte[length];
+
+                // copy until end of input or output is reached.
+                for (int i = 0; i < length; ++i) {
+                    buf[i] = (byte) name.charAt(i);
+                }
+                return ByteBuffer.wrap(buf);
+            }
+
+            public String decode(byte[] buffer) {
+                final int length = buffer.length;
+                StringBuffer result = new StringBuffer(length);
+
+                for (int i = 0; i < length; ++i) {
+                    byte b = buffer[i];
+                    if (b == 0) { // Trailing null
+                        break;
+                    }
+                    result.append((char) (b & 0xFF)); // Allow for sign-extension
+                }
+
+                return result.toString();
+            }
+        };
+
     /** Private constructor to prevent instantiation of this utility class. */
-    private TarUtils(){    
+    private TarUtils(){
     }
 
     /**
      * Parse an octal string from a buffer.
-     * Leading spaces are ignored.
-     * The buffer must contain a trailing space or NUL,
-     * and may contain an additional trailing space or NUL.
      *
-     * The input buffer is allowed to contain all NULs,
+     * <p>Leading spaces are ignored.
+     * The buffer must contain a trailing space or NUL,
+     * and may contain an additional trailing space or NUL.</p>
+     *
+     * <p>The input buffer is allowed to contain all NULs,
      * in which case the method returns 0L
-     * (this allows for missing fields).
+     * (this allows for missing fields).</p>
+     *
+     * <p>To work-around some tar implementations that insert a
+     * leading NUL this method returns 0 if it detects a leading NUL
+     * since Commons Compress 1.4.</p>
      *
      * @param buffer The buffer from which to parse.
      * @param offset The offset into the buffer from which to parse.
@@ -57,14 +108,7 @@ public class TarUtils {
             throw new IllegalArgumentException("Length "+length+" must be at least 2");
         }
 
-        boolean allNUL = true;
-        for (int i = start; i < end; i++){
-            if (buffer[i] != 0){
-                allNUL = false;
-                break;
-            }
-        }
-        if (allNUL) {
+        if (buffer[start] == 0) {
             return 0L;
         }
 
@@ -86,10 +130,11 @@ public class TarUtils {
             throw new IllegalArgumentException(
                     exceptionMessage(buffer, offset, length, end-1, trailer));
         }
-        // May have additional NUL or space
-        trailer = buffer[end-1];
-        if (trailer == 0 || trailer == ' '){
+        // May have additional NULs or spaces
+        trailer = buffer[end - 1];
+        while (start < end - 1 && (trailer == 0 || trailer == ' ')) {
             end--;
+            trailer = buffer[end - 1];
         }
 
         for ( ;start < end; start++) {
@@ -121,7 +166,7 @@ public class TarUtils {
      * missing or an invalid byte is detected in an octal number, or
      * if a binary number would exceed the size of a signed long
      * 64-bit integer.
-     * @since Apache Commons Compress 1.4
+     * @since 1.4
      */
     public static long parseOctalOrBinary(final byte[] buffer, final int offset,
                                           final int length) {
@@ -129,17 +174,52 @@ public class TarUtils {
         if ((buffer[offset] & 0x80) == 0) {
             return parseOctal(buffer, offset, length);
         }
+        final boolean negative = buffer[offset] == (byte) 0xff;
+        if (length < 9) {
+            return parseBinaryLong(buffer, offset, length, negative);
+        }
+        return parseBinaryBigInteger(buffer, offset, length, negative);
+    }
 
-        long val = buffer[offset] & 0x7f;
+    private static long parseBinaryLong(final byte[] buffer, final int offset,
+                                        final int length,
+                                        final boolean negative) {
+        if (length >= 9) {
+            throw new IllegalArgumentException("At offset " + offset + ", "
+                                               + length + " byte binary number"
+                                               + " exceeds maximum signed long"
+                                               + " value");
+        }
+        long val = 0;
         for (int i = 1; i < length; i++) {
-            if (val >= (1L << (63 - 8))) {
-                throw new IllegalArgumentException(
-                    "At offset " + offset + ", " + length + " byte " +
-                    "binary number exceeds maximum signed long value");
-            }
             val = (val << 8) + (buffer[offset + i] & 0xff);
         }
-        return val;
+        if (negative) {
+            // 2's complement
+            val--;
+            val ^= ((long) Math.pow(2, (length - 1) * 8) - 1);
+        }
+        return negative ? -val : val;
+    }
+
+    private static long parseBinaryBigInteger(final byte[] buffer,
+                                              final int offset,
+                                              final int length,
+                                              final boolean negative) {
+        byte[] remainder = new byte[length - 1];
+        System.arraycopy(buffer, offset + 1, remainder, 0, length - 1);
+        BigInteger val = new BigInteger(remainder);
+        if (negative) {
+            // 2's complement
+            val = val.add(BigInteger.valueOf(-1)).not();
+        }
+        if (val.bitLength() > 63) {
+            throw new IllegalArgumentException("At offset " + offset + ", "
+                                               + length + " byte binary number"
+                                               + " exceeds maximum signed long"
+                                               + " value");
+        }
+        return negative ? -val.longValue() : val.longValue();
     }
 
     /**
@@ -159,7 +239,7 @@ public class TarUtils {
     // Helper method to generate the exception message
     private static String exceptionMessage(byte[] buffer, final int offset,
             final int length, int current, final byte currentByte) {
-        String string = new String(buffer, offset, length);
+        String string = new String(buffer, offset, length); // TODO default charset?
         string=string.replaceAll("\0", "{NUL}"); // Replace NULs to allow string to be printed
         final String s = "Invalid byte "+currentByte+" at offset "+(current-offset)+" in '"+string+"' len="+length;
         return s;
@@ -176,22 +256,51 @@ public class TarUtils {
      * @return The entry name.
      */
     public static String parseName(byte[] buffer, final int offset, final int length) {
-        StringBuffer result = new StringBuffer(length);
-        int          end = offset + length;
-
-        for (int i = offset; i < end; ++i) {
-            byte b = buffer[i];
-            if (b == 0) { // Trailing null
-                break;
+        try {
+            return parseName(buffer, offset, length, DEFAULT_ENCODING);
+        } catch (IOException ex) {
+            try {
+                return parseName(buffer, offset, length, FALLBACK_ENCODING);
+            } catch (IOException ex2) {
+                // impossible
+                throw new RuntimeException(ex2);
             }
-            result.append((char) (b & 0xFF)); // Allow for sign-extension
         }
-
-        return result.toString();
     }
 
     /**
-     * Copy a name (StringBuffer) into a buffer.
+     * Parse an entry name from a buffer.
+     * Parsing stops when a NUL is found
+     * or the buffer length is reached.
+     *
+     * @param buffer The buffer from which to parse.
+     * @param offset The offset into the buffer from which to parse.
+     * @param length The maximum number of bytes to parse.
+     * @param encoding name of the encoding to use for file names
+     * @since Commons Compress 1.4
+     * @return The entry name.
+     */
+    public static String parseName(byte[] buffer, final int offset,
+                                   final int length,
+                                   final ZipEncoding encoding)
+        throws IOException {
+
+        int len = length;
+        for (; len > 0; len--) {
+            if (buffer[offset + len - 1] != 0) {
+                break;
+            }
+        }
+        if (len > 0) {
+            byte[] b = new byte[len];
+            System.arraycopy(buffer, offset, b, 0, len);
+            return encoding.decode(b);
+        }
+        return "";
+    }
+
+    /**
+     * Copy a name into a buffer.
      * Copies characters from the name into the buffer
      * starting at the specified offset. 
      * If the buffer is longer than the name, the buffer
@@ -206,15 +315,50 @@ public class TarUtils {
      * @return The updated offset, i.e. offset + length
      */
     public static int formatNameBytes(String name, byte[] buf, final int offset, final int length) {
-        int i;
-
-        // copy until end of input or output is reached.
-        for (i = 0; i < length && i < name.length(); ++i) {
-            buf[offset + i] = (byte) name.charAt(i);
+        try {
+            return formatNameBytes(name, buf, offset, length, DEFAULT_ENCODING);
+        } catch (IOException ex) {
+            try {
+                return formatNameBytes(name, buf, offset, length,
+                                       FALLBACK_ENCODING);
+            } catch (IOException ex2) {
+                // impossible
+                throw new RuntimeException(ex2);
+            }
         }
+    }
+
+    /**
+     * Copy a name into a buffer.
+     * Copies characters from the name into the buffer
+     * starting at the specified offset. 
+     * If the buffer is longer than the name, the buffer
+     * is filled with trailing NULs.
+     * If the name is longer than the buffer,
+     * the output is truncated.
+     *
+     * @param name The header name from which to copy the characters.
+     * @param buf The buffer where the name is to be stored.
+     * @param offset The starting offset into the buffer
+     * @param length The maximum number of header bytes to copy.
+     * @param encoding name of the encoding to use for file names
+     * @since Commons Compress 1.4
+     * @return The updated offset, i.e. offset + length
+     */
+    public static int formatNameBytes(String name, byte[] buf, final int offset,
+                                      final int length,
+                                      final ZipEncoding encoding)
+        throws IOException {
+        int len = name.length();
+        ByteBuffer b = encoding.encode(name);
+        while (b.limit() > length && len > 0) {
+            b = encoding.encode(name.substring(0, --len));
+        }
+        final int limit = b.limit() - b.position();
+        System.arraycopy(b.array(), b.arrayOffset(), buf, offset, limit);
 
         // Pad any remaining output bytes with NUL
-        for (; i < length; ++i) {
+        for (int i = limit; i < length; ++i) {
             buf[offset + i] = 0;
         }
 
@@ -297,7 +441,7 @@ public class TarUtils {
     public static int formatLongOctalBytes(final long value, byte[] buf, final int offset, final int length) {
 
         int idx=length-1; // For space
-        
+
         formatUnsignedOctalString(value, buf, offset, idx);
         buf[offset + idx] = (byte) ' '; // Trailing space
 
@@ -319,28 +463,62 @@ public class TarUtils {
      * @return The updated offset.
      * @throws IllegalArgumentException if the value (and trailer)
      * will not fit in the buffer.
-     * @since Apache Commons Compress 1.4
+     * @since 1.4
      */
     public static int formatLongOctalOrBinaryBytes(
         final long value, byte[] buf, final int offset, final int length) {
 
-        if (value < TarConstants.MAXSIZE + 1) {
+        // Check whether we are dealing with UID/GID or SIZE field
+        final long maxAsOctalChar = length == TarConstants.UIDLEN ? TarConstants.MAXID : TarConstants.MAXSIZE;
+
+        final boolean negative = value < 0;
+        if (!negative && value <= maxAsOctalChar) { // OK to store as octal chars
             return formatLongOctalBytes(value, buf, offset, length);
         }
 
-        long val = value;
+        if (length < 9) {
+            formatLongBinary(value, buf, offset, length, negative);
+        }
+        formatBigIntegerBinary(value, buf, offset, length, negative);
+
+        buf[offset] = (byte) (negative ? 0xff : 0x80);
+        return offset + length;
+    }
+
+    private static void formatLongBinary(final long value, byte[] buf,
+                                         final int offset, final int length,
+                                         final boolean negative) {
+        final int bits = (length - 1) * 8;
+        final long max = 1l << bits;
+        long val = Math.abs(value);
+        if (val >= max) {
+            throw new IllegalArgumentException("Value " + value +
+                " is too large for " + length + " byte field.");
+        }
+        if (negative) {
+            val ^= max - 1;
+            val |= 0xff << bits;
+            val++;
+        }
         for (int i = offset + length - 1; i >= offset; i--) {
             buf[i] = (byte) val;
             val >>= 8;
         }
+    }
 
-        if (val != 0 || (buf[offset] & 0x80) != 0) {
-            throw new IllegalArgumentException("Value " + value +
-                " is too large for " + length + " byte field.");
+    private static void formatBigIntegerBinary(final long value, byte[] buf,
+                                               final int offset,
+                                               final int length,
+                                               final boolean negative) {
+        BigInteger val = BigInteger.valueOf(value);
+        final byte[] b = val.toByteArray();
+        final int len = b.length;
+        final int off = offset + length - len;
+        System.arraycopy(b, 0, buf, off, len);
+        final byte fill = (byte) (negative ? 0xff : 0);
+        for (int i = offset + 1; i < off; i++) {
+            buf[i] = fill;
         }
-
-        buf[offset] |= 0x80;
-        return offset + length;
     }
 
     /**
@@ -383,4 +561,64 @@ public class TarUtils {
 
         return sum;
     }
+
+    /**
+     * Wikipedia <a href="http://en.wikipedia.org/wiki/Tar_(file_format)#File_header">says</a>:
+     * <blockquote>
+     * The checksum is calculated by taking the sum of the unsigned byte values
+     * of the header block with the eight checksum bytes taken to be ascii
+     * spaces (decimal value 32). It is stored as a six digit octal number with
+     * leading zeroes followed by a NUL and then a space. Various
+     * implementations do not adhere to this format. For better compatibility,
+     * ignore leading and trailing whitespace, and get the first six digits. In
+     * addition, some historic tar implementations treated bytes as signed.
+     * Implementations typically calculate the checksum both ways, and treat it
+     * as good if either the signed or unsigned sum matches the included
+     * checksum.
+     * </blockquote>
+     * <p>
+     * In addition there are
+     * <a href="https://issues.apache.org/jira/browse/COMPRESS-117">some tar files</a>
+     * that seem to have parts of their header cleared to zero (no detectable
+     * magic bytes, etc.) but still have a reasonable-looking checksum field
+     * present. It looks like we can detect such cases reasonably well by
+     * checking whether the stored checksum is <em>greater than</em> the
+     * computed unsigned checksum. That check is unlikely to pass on some
+     * random file header, as it would need to have a valid sequence of
+     * octal digits in just the right place.
+     * <p>
+     * The return value of this method should be treated as a best-effort
+     * heuristic rather than an absolute and final truth. The checksum
+     * verification logic may well evolve over time as more special cases
+     * are encountered.
+     *
+     * @param header tar header
+     * @return whether the checksum is reasonably good
+     * @see <a href="https://issues.apache.org/jira/browse/COMPRESS-191">COMPRESS-191</a>
+     * @since 1.5
+     */
+    public static boolean verifyCheckSum(byte[] header) {
+        long storedSum = 0;
+        long unsignedSum = 0;
+        long signedSum = 0;
+
+        int digits = 0;
+        for (int i = 0; i < header.length; i++) {
+            byte b = header[i];
+            if (CHKSUM_OFFSET  <= i && i < CHKSUM_OFFSET + CHKSUMLEN) {
+                if ('0' <= b && b <= '7' && digits++ < 6) {
+                    storedSum = storedSum * 8 + b - '0';
+                } else if (digits > 0) {
+                    digits = 6; // only look at the first octal digit sequence
+                }
+                b = ' ';
+            }
+            unsignedSum += 0xff & b;
+            signedSum += b;
+        }
+
+        return storedSum == unsignedSum || storedSum == signedSum
+                || storedSum > unsignedSum; // COMPRESS-177
+    }
+
 }

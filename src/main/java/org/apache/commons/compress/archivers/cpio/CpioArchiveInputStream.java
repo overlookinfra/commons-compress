@@ -363,7 +363,7 @@ public class CpioArchiveInputStream extends ArchiveInputStream implements
         ret.setInode(readBinaryLong(2, swapHalfWord));
         final long mode = readBinaryLong(2, swapHalfWord);
         if (mode != 0){
-            ret.setMode(mode);            
+            ret.setMode(mode);
         }
         ret.setUID(readBinaryLong(2, swapHalfWord));
         ret.setGID(readBinaryLong(2, swapHalfWord));
@@ -385,7 +385,7 @@ public class CpioArchiveInputStream extends ArchiveInputStream implements
     private String readCString(final int length) throws IOException {
         byte tmpBuffer[] = new byte[length];
         readFully(tmpBuffer, 0, tmpBuffer.length);
-        return new String(tmpBuffer, 0, tmpBuffer.length - 1);
+        return new String(tmpBuffer, 0, tmpBuffer.length - 1); // TODO default charset?
     }
 
     /**
@@ -433,7 +433,7 @@ public class CpioArchiveInputStream extends ArchiveInputStream implements
      * Checks if the signature matches one of the following magic values:
      * 
      * Strings:
-     *  
+     *
      * "070701" - MAGIC_NEW
      * "070702" - MAGIC_NEW_CRC
      * "070707" - MAGIC_OLD_ASCII
@@ -446,7 +446,7 @@ public class CpioArchiveInputStream extends ArchiveInputStream implements
         if (length < 6) {
             return false;
         }
-        
+
         // Check binary values
         if (signature[0] == 0x71 && (signature[1] & 0xFF) == 0xc7) {
             return true;

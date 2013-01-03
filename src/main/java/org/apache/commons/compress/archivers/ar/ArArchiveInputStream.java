@@ -190,7 +190,7 @@ public class ArArchiveInputStream extends ArchiveInputStream {
         throw new IOException("Failed to read entry: "+offset);
     }
     private long asLong(byte[] input) {
-        return Long.parseLong(new String(input).trim());
+        return Long.parseLong(ArchiveUtils.toAsciiString(input).trim());
     }
 
     private int asInt(byte[] input) {
@@ -206,7 +206,7 @@ public class ArArchiveInputStream extends ArchiveInputStream {
     }
 
     private int asInt(byte[] input, int base, boolean treatBlankAsZero) {
-        String string = new String(input).trim();
+        String string = ArchiveUtils.toAsciiString(input).trim();
         if (string.length() == 0 && treatBlankAsZero) {
             return 0;
         }
@@ -317,20 +317,20 @@ public class ArArchiveInputStream extends ArchiveInputStream {
      * <p>From the FreeBSD ar(5) man page:</p>
      * <pre>
      * BSD   In the BSD variant, names that are shorter than 16
-     *	     characters and without embedded spaces are stored
-     *	     directly in this field.  If a name has an embedded
-     *	     space, or if it is longer than 16 characters, then
-     *	     the string "#1/" followed by the decimal represen-
-     *	     tation of the length of the file name is placed in
-     *	     this field.	The actual file name is stored immedi-
-     *	     ately after the archive header.  The content of the
-     *	     archive member follows the file name.  The ar_size
-     *	     field of the header (see below) will then hold the
-     *	     sum of the size of the file name and the size of
-     *	     the member.
+     *       characters and without embedded spaces are stored
+     *       directly in this field.  If a name has an embedded
+     *       space, or if it is longer than 16 characters, then
+     *       the string "#1/" followed by the decimal represen-
+     *       tation of the length of the file name is placed in
+     *       this field. The actual file name is stored immedi-
+     *       ately after the archive header.  The content of the
+     *       archive member follows the file name.  The ar_size
+     *       field of the header (see below) will then hold the
+     *       sum of the size of the file name and the size of
+     *       the member.
      * </pre>
      *
-     * @since Apache Commons Compress 1.3
+     * @since 1.3
      */
     private static boolean isBSDLongName(String name) {
         return name != null && name.matches(BSD_LONGNAME_PATTERN);
@@ -342,7 +342,7 @@ public class ArArchiveInputStream extends ArchiveInputStream {
      *
      * @see #isBSDLongName
      *
-     * @since Apache Commons Compress 1.3
+     * @since 1.3
      */
     private String getBSDLongName(String bsdLongName) throws IOException {
         int nameLen =

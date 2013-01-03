@@ -23,17 +23,19 @@
 
 package org.apache.commons.compress.archivers.tar;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
+import org.apache.commons.compress.archivers.zip.ZipEncoding;
+import org.apache.commons.compress.archivers.zip.ZipEncodingHelper;
 import org.apache.commons.compress.utils.ArchiveUtils;
+import org.apache.commons.compress.utils.CharsetNames;
 
 /**
  * The TarInputStream reads a UNIX tar archive as an InputStream.
@@ -52,6 +54,7 @@ public class TarArchiveInputStream extends ArchiveInputStream {
     private byte[] readBuf;
     protected final TarBuffer buffer;
     private TarArchiveEntry currEntry;
+    private final ZipEncoding encoding;
 
     /**
      * Constructor for TarInputStream.
@@ -59,6 +62,16 @@ public class TarArchiveInputStream extends ArchiveInputStream {
      */
     public TarArchiveInputStream(InputStream is) {
         this(is, TarBuffer.DEFAULT_BLKSIZE, TarBuffer.DEFAULT_RCDSIZE);
+    }
+
+    /**
+     * Constructor for TarInputStream.
+     * @param is the input stream to use
+     * @param encoding name of the encoding to use for file names
+     * @since Commons Compress 1.4
+     */
+    public TarArchiveInputStream(InputStream is, String encoding) {
+        this(is, TarBuffer.DEFAULT_BLKSIZE, TarBuffer.DEFAULT_RCDSIZE, encoding);
     }
 
     /**
@@ -74,12 +87,38 @@ public class TarArchiveInputStream extends ArchiveInputStream {
      * Constructor for TarInputStream.
      * @param is the input stream to use
      * @param blockSize the block size to use
+     * @param encoding name of the encoding to use for file names
+     * @since Commons Compress 1.4
+     */
+    public TarArchiveInputStream(InputStream is, int blockSize,
+                                 String encoding) {
+        this(is, blockSize, TarBuffer.DEFAULT_RCDSIZE, encoding);
+    }
+
+    /**
+     * Constructor for TarInputStream.
+     * @param is the input stream to use
+     * @param blockSize the block size to use
      * @param recordSize the record size to use
      */
     public TarArchiveInputStream(InputStream is, int blockSize, int recordSize) {
+        this(is, blockSize, recordSize, null);
+    }
+
+    /**
+     * Constructor for TarInputStream.
+     * @param is the input stream to use
+     * @param blockSize the block size to use
+     * @param recordSize the record size to use
+     * @param encoding name of the encoding to use for file names
+     * @since Commons Compress 1.4
+     */
+    public TarArchiveInputStream(InputStream is, int blockSize, int recordSize,
+                                 String encoding) {
         this.buffer = new TarBuffer(is, blockSize, recordSize);
         this.readBuf = null;
         this.hasHitEOF = false;
+        this.encoding = ZipEncodingHelper.getZipEncoding(encoding);
     }
 
     /**
@@ -106,7 +145,7 @@ public class TarArchiveInputStream extends ArchiveInputStream {
      * is left in the entire archive, only in the current entry.
      * This value is determined from the entry's size header field
      * and the amount of data already read from the current entry.
-     * Integer.MAX_VALUE is returen in case more than Integer.MAX_VALUE
+     * Integer.MAX_VALUE is returned in case more than Integer.MAX_VALUE
      * bytes are left in the current entry in the archive.
      *
      * @return The number of available bytes for the current entry.
@@ -180,7 +219,8 @@ public class TarArchiveInputStream extends ArchiveInputStream {
             while (numToSkip > 0) {
                 long skipped = skip(numToSkip);
                 if (skipped <= 0) {
-                    throw new RuntimeException("failed to skip current tar entry");
+                    throw new RuntimeException("failed to skip current tar"
+                                               + " entry");
                 }
                 numToSkip -= skipped;
             }
@@ -195,7 +235,13 @@ public class TarArchiveInputStream extends ArchiveInputStream {
             return null;
         }
 
-        currEntry = new TarArchiveEntry(headerBuf);
+        try {
+            currEntry = new TarArchiveEntry(headerBuf, encoding);
+        } catch (IllegalArgumentException e) {
+            IOException ioe = new IOException("Error detected parsing the header");
+            ioe.initCause(e);
+            throw ioe;
+        }
         entryOffset = 0;
         entrySize = currEntry.getSize();
 
@@ -205,7 +251,7 @@ public class TarArchiveInputStream extends ArchiveInputStream {
             byte[] buf = new byte[SMALL_BUFFER_SIZE];
             int length = 0;
             while ((length = read(buf)) >= 0) {
-                longName.append(new String(buf, 0, length));
+                longName.append(new String(buf, 0, length)); // TODO default charset?
             }
             getNextEntry();
             if (currEntry == null) {
@@ -266,57 +312,44 @@ public class TarArchiveInputStream extends ArchiveInputStream {
     }
 
     private void paxHeaders() throws IOException{
-        Reader br = new InputStreamReader(this, "UTF-8") {
-                @Override
-                public void close() {
-                    // make sure GC doesn't close "this" before we are done
-                }
-            };
-        Map<String, String> headers = null;
-        try {
-            headers = parsePaxHeaders(br);
-        } finally {
-            // NO-OP but makes FindBugs happy
-            br.close();
-        }
-
+        Map<String, String> headers = parsePaxHeaders(this);
         getNextEntry(); // Get the actual file entry
         applyPaxHeadersToCurrentEntry(headers);
     }
 
-    Map<String, String> parsePaxHeaders(Reader br) throws IOException {
+    Map<String, String> parsePaxHeaders(InputStream i) throws IOException {
         Map<String, String> headers = new HashMap<String, String>();
         // Format is "length keyword=value\n";
         while(true){ // get length
             int ch;
             int len = 0;
             int read = 0;
-            while((ch = br.read()) != -1){
+            while((ch = i.read()) != -1) {
                 read++;
                 if (ch == ' '){ // End of length string
                     // Get keyword
-                    StringBuffer sb = new StringBuffer();
-                    while((ch = br.read()) != -1){
+                    ByteArrayOutputStream coll = new ByteArrayOutputStream();
+                    while((ch = i.read()) != -1) {
                         read++;
                         if (ch == '='){ // end of keyword
-                            String keyword = sb.toString();
+                            String keyword = coll.toString(CharsetNames.UTF_8);
                             // Get rest of entry
-                            char[] cbuf = new char[len-read];
-                            int got = br.read(cbuf);
+                            byte[] rest = new byte[len - read];
+                            int got = i.read(rest);
                             if (got != len - read){
                                 throw new IOException("Failed to read "
                                                       + "Paxheader. Expected "
                                                       + (len - read)
-                                                      + " chars, read "
+                                                      + " bytes, read "
                                                       + got);
                             }
                             // Drop trailing NL
-                            String value = new String(cbuf, 0,
-                                                      len - read - 1);
+                            String value = new String(rest, 0,
+                                                      len - read - 1, CharsetNames.UTF_8);
                             headers.put(keyword, value);
                             break;
                         }
-                        sb.append((char) ch);
+                        coll.write((byte) ch);
                     }
                     break; // Processed single header
                 }
@@ -333,12 +366,14 @@ public class TarArchiveInputStream extends ArchiveInputStream {
     private void applyPaxHeadersToCurrentEntry(Map<String, String> headers) {
         /*
          * The following headers are defined for Pax.
-         * atime, ctime, mtime, charset: cannot use these without changing TarArchiveEntry fields
+         * atime, ctime, charset: cannot use these without changing TarArchiveEntry fields
+         * mtime
          * comment
          * gid, gname
          * linkpath
          * size
          * uid,uname
+         * SCHILY.devminor, SCHILY.devmajor: don't have setters/getters for those
          */
         for (Entry<String, String> ent : headers.entrySet()){
             String key = ent.getKey();
@@ -357,6 +392,12 @@ public class TarArchiveInputStream extends ArchiveInputStream {
                 currEntry.setUserName(val);
             } else if ("size".equals(key)){
                 currEntry.setSize(Long.parseLong(val));
+            } else if ("mtime".equals(key)){
+                currEntry.setModTime((long) (Double.parseDouble(val) * 1000));
+            } else if ("SCHILY.devminor".equals(key)){
+                currEntry.setDevMinor(Integer.parseInt(val));
+            } else if ("SCHILY.devmajor".equals(key)){
+                currEntry.setDevMajor(Integer.parseInt(val));
             }
         }
     }

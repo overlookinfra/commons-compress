@@ -18,9 +18,9 @@
 package org.apache.commons.compress.archivers.zip;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipException;
 
 /**
@@ -38,7 +38,7 @@ public class ExtraFieldUtils {
     private static final Map<ZipShort, Class<?>> implementations;
 
     static {
-        implementations = new HashMap<ZipShort, Class<?>>();
+        implementations = new ConcurrentHashMap<ZipShort, Class<?>>();
         register(AsiExtraField.class);
         register(JarMarker.class);
         register(UnicodePathExtraField.class);
@@ -67,12 +67,12 @@ public class ExtraFieldUtils {
     }
 
     /**
-     * Create an instance of the approriate ExtraField, falls back to
+     * Create an instance of the appropriate ExtraField, falls back to
      * {@link UnrecognizedExtraField UnrecognizedExtraField}.
      * @param headerId the header identifier
-     * @return an instance of the appropiate ExtraField
+     * @return an instance of the appropriate ExtraField
      * @exception InstantiationException if unable to instantiate the class
-     * @exception IllegalAccessException if not allowed to instatiate the class
+     * @exception IllegalAccessException if not allowed to instantiate the class
      */
     public static ZipExtraField createExtraField(ZipShort headerId)
         throws InstantiationException, IllegalAccessException {
@@ -122,7 +122,7 @@ public class ExtraFieldUtils {
      * @return an array of ExtraFields
      * @throws ZipException on error
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public static ZipExtraField[] parse(byte[] data, boolean local,
                                         UnparseableExtraField onUnparseableData)
@@ -197,8 +197,8 @@ public class ExtraFieldUtils {
             lastIsUnparseableHolder ? data.length - 1 : data.length;
 
         int sum = WORD * regularExtraFieldCount;
-        for (int i = 0; i < data.length; i++) {
-            sum += data[i].getLocalFileDataLength().getValue();
+        for (ZipExtraField element : data) {
+            sum += element.getLocalFileDataLength().getValue();
         }
 
         byte[] result = new byte[sum];
@@ -231,8 +231,8 @@ public class ExtraFieldUtils {
             lastIsUnparseableHolder ? data.length - 1 : data.length;
 
         int sum = WORD * regularExtraFieldCount;
-        for (int i = 0; i < data.length; i++) {
-            sum += data[i].getCentralDirectoryLength().getValue();
+        for (ZipExtraField element : data) {
+            sum += element.getCentralDirectoryLength().getValue();
         }
         byte[] result = new byte[sum];
         int start = 0;
@@ -256,7 +256,7 @@ public class ExtraFieldUtils {
      * "enum" for the possible actions to take if the extra field
      * cannot be parsed.
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public static final class UnparseableExtraField {
         /**

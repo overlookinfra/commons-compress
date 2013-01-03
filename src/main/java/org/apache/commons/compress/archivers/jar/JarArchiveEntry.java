@@ -24,14 +24,13 @@ import java.util.jar.JarEntry;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 
 /**
  *
  * @NotThreadSafe
  */
-public class JarArchiveEntry extends ZipArchiveEntry implements ArchiveEntry {
+public class JarArchiveEntry extends ZipArchiveEntry {
 
     private Attributes manifestAttributes = null;
     private Certificate[] certificates = null;
@@ -58,12 +57,12 @@ public class JarArchiveEntry extends ZipArchiveEntry implements ArchiveEntry {
     }
 
     public Certificate[] getCertificates() {
-            if (certificates != null) {
-                Certificate[] certs = new Certificate[certificates.length];
-                System.arraycopy(certificates, 0, certs, 0, certs.length);
-                return certs;
-            }
-            return null;
+        if (certificates != null) {
+            Certificate[] certs = new Certificate[certificates.length];
+            System.arraycopy(certificates, 0, certs, 0, certs.length);
+            return certs;
+        }
+        return null;
     }
 
     @Override

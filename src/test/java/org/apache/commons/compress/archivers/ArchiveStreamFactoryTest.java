@@ -18,10 +18,16 @@
  */
 package org.apache.commons.compress.archivers;
 
-import java.io.ByteArrayInputStream;
-import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.InputStream;
+
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
+import org.junit.Test;
 
 public class ArchiveStreamFactoryTest {
 
@@ -39,4 +45,57 @@ public class ArchiveStreamFactoryTest {
         }
     }
 
+    /**
+     * see https://issues.apache.org/jira/browse/COMPRESS-191
+     */
+    @Test
+    public void aiffFilesAreNoTARs() throws Exception {
+        InputStream is = null;
+        try {
+            is = new BufferedInputStream(new FileInputStream("src/test/resources/testAIFF.aif"));
+            new ArchiveStreamFactory().createArchiveInputStream(is);
+            fail("created an input stream for a non-archive");
+        } catch (ArchiveException ae) {
+            assertTrue(ae.getMessage().startsWith("No Archiver found"));
+        } finally {
+            if (is != null) {
+                is.close();
+            }
+        }
+    }
+
+    @Test
+    public void testCOMPRESS209() throws Exception {
+        InputStream is = null;
+        try {
+            is = new BufferedInputStream(new FileInputStream("src/test/resources/testCompress209.doc"));
+            new ArchiveStreamFactory().createArchiveInputStream(is);
+            fail("created an input stream for a non-archive");
+        } catch (ArchiveException ae) {
+            assertTrue(ae.getMessage().startsWith("No Archiver found"));
+        } finally {
+            if (is != null) {
+                is.close();
+            }
+        }
+    }
+
+    /**
+     * Test case for 
+     * <a href="https://issues.apache.org/jira/browse/COMPRESS-208"
+     * >COMPRESS-208</a>.
+     */
+    @Test
+    public void skipsPK00Prefix() throws Exception {
+        InputStream is = null;
+        try {
+            is = new BufferedInputStream(new FileInputStream("src/test/resources/COMPRESS-208.zip"));
+            ArchiveInputStream ais = new ArchiveStreamFactory().createArchiveInputStream(is);
+            assertTrue(ais instanceof ZipArchiveInputStream);
+        } finally {
+            if (is != null) {
+                is.close();
+            }
+        }
+    }
 }

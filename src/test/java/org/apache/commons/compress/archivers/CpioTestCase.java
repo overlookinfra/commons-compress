@@ -28,9 +28,9 @@ import java.util.Map;
 
 import org.apache.commons.compress.AbstractTestCase;
 import org.apache.commons.compress.archivers.cpio.CpioArchiveEntry;
-import org.apache.commons.compress.archivers.cpio.CpioConstants;
 import org.apache.commons.compress.archivers.cpio.CpioArchiveInputStream;
 import org.apache.commons.compress.archivers.cpio.CpioArchiveOutputStream;
+import org.apache.commons.compress.archivers.cpio.CpioConstants;
 import org.apache.commons.compress.utils.IOUtils;
 
 public final class CpioTestCase extends AbstractTestCase {
@@ -61,7 +61,7 @@ public final class CpioTestCase extends AbstractTestCase {
         final File file2 = getFile("test2.xml");
         final long file1Length = file1.length();
         final long file2Length = file2.length();
-        
+
         {
             final OutputStream out = new FileOutputStream(output);
             final ArchiveOutputStream os = new ArchiveStreamFactory().createArchiveOutputStream("cpio", out);

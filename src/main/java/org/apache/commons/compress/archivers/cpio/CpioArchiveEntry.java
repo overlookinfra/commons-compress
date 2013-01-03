@@ -251,7 +251,7 @@ public class CpioArchiveEntry implements CpioConstants, ArchiveEntry {
      * CpioConstants.FORMAT_OLD_BINARY<br/>
      * CpioConstants.FORMAT_OLD_ASCII<br/>
      * 
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public CpioArchiveEntry(final short format, final String name) {
         this(format);
@@ -289,7 +289,7 @@ public class CpioArchiveEntry implements CpioConstants, ArchiveEntry {
      * CpioConstants.FORMAT_OLD_BINARY<br/>
      * CpioConstants.FORMAT_OLD_ASCII<br/>
      * 
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public CpioArchiveEntry(final short format, final String name,
                             final long size) {
@@ -329,7 +329,7 @@ public class CpioArchiveEntry implements CpioConstants, ArchiveEntry {
      * CpioConstants.FORMAT_OLD_BINARY<br/>
      * CpioConstants.FORMAT_OLD_ASCII<br/>
      * 
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public CpioArchiveEntry(final short format, File inputFile,
                             String entryName) {
@@ -467,7 +467,7 @@ public class CpioArchiveEntry implements CpioConstants, ArchiveEntry {
      * @return the number of bytes needed to pad the header (0,1,2,3)
      */
     public int getHeaderPadCount(){
-        if (this.alignmentBoundary == 0) return 0;
+        if (this.alignmentBoundary == 0) { return 0; }
         int size = this.headerSize+this.name.length()+1; // Name has terminating null
         int remain = size % this.alignmentBoundary;
         if (remain > 0){
@@ -482,7 +482,7 @@ public class CpioArchiveEntry implements CpioConstants, ArchiveEntry {
      * @return the number of bytes needed to pad the data (0,1,2,3)
      */
     public int getDataPadCount(){
-        if (this.alignmentBoundary == 0) return 0;
+        if (this.alignmentBoundary == 0) { return 0; }
         long size = this.filesize;
         int remain = (int) (size % this.alignmentBoundary);
         if (remain > 0){

@@ -19,25 +19,28 @@
 package org.apache.commons.compress.archivers.ar;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.commons.compress.AbstractTestCase;
 
 public class ArArchiveOutputStreamTest extends AbstractTestCase {
 
     public void testLongFileNamesCauseExceptionByDefault() {
+        ArArchiveOutputStream os = null;
         try {
-            ArArchiveOutputStream os =
-                new ArArchiveOutputStream(new ByteArrayOutputStream());
+            os = new ArArchiveOutputStream(new ByteArrayOutputStream());
             ArArchiveEntry ae = new ArArchiveEntry("this_is_a_long_name.txt",
                                                    0);
             os.putArchiveEntry(ae);
             fail("Expected an exception");
         } catch (IOException ex) {
             assertTrue(ex.getMessage().startsWith("filename too long"));
+        } finally {
+            closeQuietly(os);
         }
     }
 

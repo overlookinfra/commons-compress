@@ -18,6 +18,9 @@
 
 package org.apache.commons.compress.archivers.zip;
 
+import java.io.ByteArrayOutputStream;
+import java.util.zip.ZipEntry;
+
 import junit.framework.TestCase;
 
 /**
@@ -202,25 +205,26 @@ public class ZipArchiveEntryTest extends TestCase {
      * <a href="https://issues.apache.org/jira/browse/COMPRESS-93"
      * >COMPRESS-93</a>.
      */
-    public void testCompressionMethod() {
+    public void testCompressionMethod() throws Exception {
         ZipArchiveOutputStream zos =
-            new ZipArchiveOutputStream((java.io.OutputStream) null);
+            new ZipArchiveOutputStream(new ByteArrayOutputStream());
         ZipArchiveEntry entry = new ZipArchiveEntry("foo");
         assertEquals(-1, entry.getMethod());
         assertFalse(zos.canWriteEntryData(entry));
 
-        entry.setMethod(ZipArchiveEntry.STORED);
-        assertEquals(ZipArchiveEntry.STORED, entry.getMethod());
+        entry.setMethod(ZipEntry.STORED);
+        assertEquals(ZipEntry.STORED, entry.getMethod());
         assertTrue(zos.canWriteEntryData(entry));
 
-        entry.setMethod(ZipArchiveEntry.DEFLATED);
-        assertEquals(ZipArchiveEntry.DEFLATED, entry.getMethod());
+        entry.setMethod(ZipEntry.DEFLATED);
+        assertEquals(ZipEntry.DEFLATED, entry.getMethod());
         assertTrue(zos.canWriteEntryData(entry));
 
         // Test the unsupported "imploded" compression method (6)
         entry.setMethod(6);
         assertEquals(6, entry.getMethod());
         assertFalse(zos.canWriteEntryData(entry));
+        zos.close();
     }
 
     /**
@@ -232,5 +236,21 @@ public class ZipArchiveEntryTest extends TestCase {
         ZipArchiveEntry entry1 = new ZipArchiveEntry("foo");
         ZipArchiveEntry entry2 = new ZipArchiveEntry("bar");
         assertFalse(entry1.equals(entry2));
+    }
+
+    /**
+     * Tests comment's influence on equals comparisons.
+     * @see "https://issues.apache.org/jira/browse/COMPRESS-187"
+     */
+    public void testNullCommentEqualsEmptyComment() {
+        ZipArchiveEntry entry1 = new ZipArchiveEntry("foo");
+        ZipArchiveEntry entry2 = new ZipArchiveEntry("foo");
+        ZipArchiveEntry entry3 = new ZipArchiveEntry("foo");
+        entry1.setComment(null);
+        entry2.setComment("");
+        entry3.setComment("bar");
+        assertEquals(entry1, entry2);
+        assertFalse(entry1.equals(entry3));
+        assertFalse(entry2.equals(entry3));
     }
 }

@@ -50,17 +50,32 @@ public final class ZipLong implements Cloneable {
     public static final ZipLong LFH_SIG = new ZipLong(0X04034B50L);
 
     /**
-     * Data Descriptor signature
-     * @since Apache Commons Compress 1.1
+     * Data Descriptor signature.
+     *
+     * <p>Actually, PKWARE uses this as marker for split/spanned
+     * archives and other archivers have started to use it as Data
+     * Descriptor signature (as well).</p>
+     * @since 1.1
      */
     public static final ZipLong DD_SIG = new ZipLong(0X08074B50L);
 
     /**
      * Value stored in size and similar fields if ZIP64 extensions are
      * used.
-     * @since Apache Commons Compress 1.3
+     * @since 1.3
      */
     static final ZipLong ZIP64_MAGIC = new ZipLong(ZipConstants.ZIP64_MAGIC);
+
+    /**
+     * Marks ZIP archives that were supposed to be split or spanned
+     * but only needed a single segment in then end (so are actually
+     * neither split nor spanned).
+     *
+     * <p>This is the "PK00" prefix found in some archives.</p>
+     * @since 1.5
+     */
+    public static final ZipLong SINGLE_SEGMENT_SPLIT_MARKER =
+        new ZipLong(0X30304B50L);
 
     /**
      * Create instance from a number.

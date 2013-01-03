@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  * File name mapping code for the compression formats.
  * @ThreadSafe
- * @since Apache Commons Compress 1.4
+ * @since 1.4
  */
 public class FileNameUtil {
 
@@ -35,7 +35,7 @@ public class FileNameUtil {
      * versions of those file types. For example: from ".tar" to ".tgz".
      */
     private final Map<String, String> compressSuffix =
-        new HashMap<String, String>();        
+        new HashMap<String, String>();
 
     /**
      * Map from common filename suffixes of compressed files to the
@@ -127,8 +127,8 @@ public class FileNameUtil {
      * Detects common format suffixes in the given filename.
      *
      * @param filename name of a file
-     * @return <code>true</code> if the filename has a common format suffix,
-     *         <code>false</code> otherwise
+     * @return {@code true} if the filename has a common format suffix,
+     *         {@code false} otherwise
      */
     public boolean isCompressedFilename(String filename) {
         final String lower = filename.toLowerCase(Locale.ENGLISH);

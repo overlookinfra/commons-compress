@@ -42,21 +42,21 @@ import org.apache.commons.compress.archivers.ArchiveException;
  * as JUnit does not allow one to change the display name of a test.
  */
 public class ArchiveReadTests extends AbstractTestCase {
-    
+
     final static ClassLoader classLoader = ArchiveReadTests.class.getClassLoader();
 
     private File file;
     private static final ArrayList<String> fileList = new ArrayList<String>();
-    
+
     public ArchiveReadTests(String name) {
         super(name);
     }
-    
+
     private ArchiveReadTests(String name, File file){
         super(name);
         this.file = file;
     }
-    
+
     public static TestSuite suite() throws IOException{
         TestSuite suite = new TestSuite("ArchiveReadTests");
         File arcdir =new File(classLoader.getResource("archives").getFile());
@@ -73,8 +73,7 @@ public class ArchiveReadTests extends AbstractTestCase {
         }
         br.close();
         File[]files=arcdir.listFiles();
-        for (int i=0; i<files.length; i++){
-            final File file = files[i];
+        for (final File file : files) {
             if (file.getName().endsWith(".txt")){
                 continue;
             }
@@ -83,10 +82,10 @@ public class ArchiveReadTests extends AbstractTestCase {
             Test test = new ArchiveReadTests("testArchive", file);
             namedSuite.addTest(test);
             suite.addTest(namedSuite);
-        }        
+        }
         return suite;
     }
-    
+
     // files.txt contains size and filename
     @Override
     protected String getExpectedString(ArchiveEntry entry) {

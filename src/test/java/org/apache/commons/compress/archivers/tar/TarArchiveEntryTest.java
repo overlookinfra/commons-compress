@@ -23,11 +23,12 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Locale;
+
 import junit.framework.TestCase;
 
 import org.apache.commons.compress.AbstractTestCase;
 
-public class TarArchiveEntryTest extends TestCase {
+public class TarArchiveEntryTest extends TestCase implements TarConstants {
 
     private static final String OS =
         System.getProperty("os.name").toLowerCase(Locale.US);
@@ -79,15 +80,19 @@ public class TarArchiveEntryTest extends TestCase {
             t = tin.getNextTarEntry();
             assertNotNull(t);
             assertEquals("/", t.getName());
+            assertTrue(t.isCheckSumOK());
             t = tin.getNextTarEntry();
             assertNotNull(t);
             assertEquals("foo.txt", t.getName());
+            assertTrue(t.isCheckSumOK());
             t = tin.getNextTarEntry();
             assertNotNull(t);
             assertEquals("bar.txt", t.getName());
+            assertTrue(t.isCheckSumOK());
             t = tin.getNextTarEntry();
             assertNotNull(t);
             assertEquals("baz.txt", t.getName());
+            assertTrue(t.isCheckSumOK());
         } finally {
             if (tin != null) {
                 tin.close();
@@ -98,7 +103,7 @@ public class TarArchiveEntryTest extends TestCase {
             AbstractTestCase.tryHardToDelete(f);
         }
     }
-    
+
     public void testMaxFileSize(){
         TarArchiveEntry t = new TarArchiveEntry("");
         t.setSize(0);
@@ -110,5 +115,38 @@ public class TarArchiveEntryTest extends TestCase {
         }
         t.setSize(077777777777L);
         t.setSize(0100000000000L);
+    }
+
+    public void testLinkFlagConstructor() throws IOException {
+        TarArchiveEntry t = new TarArchiveEntry("/foo", LF_GNUTYPE_LONGNAME);
+        assertGnuMagic(t);
+        assertEquals("foo", t.getName());
+    }
+
+    public void testLinkFlagConstructorWithFileFlag() throws IOException {
+        TarArchiveEntry t = new TarArchiveEntry("/foo", LF_NORMAL);
+        assertPosixMagic(t);
+        assertEquals("foo", t.getName());
+    }
+
+    public void testLinkFlagConstructorWithPreserve() throws IOException {
+        TarArchiveEntry t = new TarArchiveEntry("/foo", LF_GNUTYPE_LONGNAME,
+                                                true);
+        assertGnuMagic(t);
+        assertEquals("/foo", t.getName());
+    }
+
+    private void assertGnuMagic(TarArchiveEntry t) throws IOException {
+        assertEquals(MAGIC_GNU + VERSION_GNU_SPACE, readMagic(t));
+    }
+
+    private void assertPosixMagic(TarArchiveEntry t) throws IOException {
+        assertEquals(MAGIC_POSIX + VERSION_POSIX, readMagic(t));
+    }
+
+    private String readMagic(TarArchiveEntry t) throws IOException {
+        byte[] buf = new byte[512];
+        t.writeEntryHeader(buf);
+        return new String(buf, MAGIC_OFFSET, MAGICLEN + VERSIONLEN);
     }
 }

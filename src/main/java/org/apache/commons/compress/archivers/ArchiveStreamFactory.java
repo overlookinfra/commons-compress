@@ -105,6 +105,32 @@ public class ArchiveStreamFactory {
     public static final String ZIP = "zip";
 
     /**
+     * Entry encoding, null for the default.
+     */
+    private String entryEncoding = null;
+
+    /**
+     * Returns the encoding to use for zip and tar files, or null for
+     * the default.
+     *
+     * @return entry encoding, or null
+     * @since 1.5
+     */
+    public String getEntryEncoding() {
+        return entryEncoding;
+    }
+
+    /**
+     * Sets the encoding to use for zip and tar files. Use null for
+     * the default.
+     *
+     * @since 1.5
+     */
+    public void setEntryEncoding(String entryEncoding) {
+        this.entryEncoding = entryEncoding;
+    }
+
+    /**
      * Create an archive input stream from an archiver name and an input stream.
      * 
      * @param archiverName the archive name, i.e. "ar", "zip", "tar", "jar", "dump" or "cpio"
@@ -116,11 +142,11 @@ public class ArchiveStreamFactory {
     public ArchiveInputStream createArchiveInputStream(
             final String archiverName, final InputStream in)
             throws ArchiveException {
-        
+
         if (archiverName == null) {
             throw new IllegalArgumentException("Archivername must not be null.");
         }
-        
+
         if (in == null) {
             throw new IllegalArgumentException("InputStream must not be null.");
         }
@@ -129,10 +155,18 @@ public class ArchiveStreamFactory {
             return new ArArchiveInputStream(in);
         }
         if (ZIP.equalsIgnoreCase(archiverName)) {
-            return new ZipArchiveInputStream(in);
+            if (entryEncoding != null) {
+                return new ZipArchiveInputStream(in, entryEncoding);
+            } else {
+                return new ZipArchiveInputStream(in);
+            }
         }
         if (TAR.equalsIgnoreCase(archiverName)) {
-            return new TarArchiveInputStream(in);
+            if (entryEncoding != null) {
+                return new TarArchiveInputStream(in, entryEncoding);
+            } else {
+                return new TarArchiveInputStream(in);
+            }
         }
         if (JAR.equalsIgnoreCase(archiverName)) {
             return new JarArchiveInputStream(in);
@@ -143,7 +177,7 @@ public class ArchiveStreamFactory {
         if (DUMP.equalsIgnoreCase(archiverName)) {
             return new DumpArchiveInputStream(in);
         }
-        
+
         throw new ArchiveException("Archiver: " + archiverName + " not found.");
     }
 
@@ -170,10 +204,18 @@ public class ArchiveStreamFactory {
             return new ArArchiveOutputStream(out);
         }
         if (ZIP.equalsIgnoreCase(archiverName)) {
-            return new ZipArchiveOutputStream(out);
+            ZipArchiveOutputStream zip = new ZipArchiveOutputStream(out);
+            if (entryEncoding != null) {
+                zip.setEncoding(entryEncoding);
+            }
+            return zip;
         }
         if (TAR.equalsIgnoreCase(archiverName)) {
-            return new TarArchiveOutputStream(out);
+            if (entryEncoding != null) {
+                return new TarArchiveOutputStream(out, entryEncoding);
+            } else {
+                return new TarArchiveOutputStream(out);
+            }
         }
         if (JAR.equalsIgnoreCase(archiverName)) {
             return new JarArchiveOutputStream(out);
@@ -210,7 +252,11 @@ public class ArchiveStreamFactory {
             int signatureLength = in.read(signature);
             in.reset();
             if (ZipArchiveInputStream.matches(signature, signatureLength)) {
-                return new ZipArchiveInputStream(in);
+                if (entryEncoding != null) {
+                    return new ZipArchiveInputStream(in, entryEncoding);
+                } else {
+                    return new ZipArchiveInputStream(in);
+                }
             } else if (JarArchiveInputStream.matches(signature, signatureLength)) {
                 return new JarArchiveInputStream(in);
             } else if (ArArchiveInputStream.matches(signature, signatureLength)) {
@@ -234,19 +280,34 @@ public class ArchiveStreamFactory {
             signatureLength = in.read(tarheader);
             in.reset();
             if (TarArchiveInputStream.matches(tarheader, signatureLength)) {
-                return new TarArchiveInputStream(in);
+                if (entryEncoding != null) {
+                    return new TarArchiveInputStream(in, entryEncoding);
+                } else {
+                    return new TarArchiveInputStream(in);
+                }
             }
             // COMPRESS-117 - improve auto-recognition
             if (signatureLength >= 512) {
+                TarArchiveInputStream tais = null;
                 try {
-                    TarArchiveInputStream tais = new TarArchiveInputStream(new ByteArrayInputStream(tarheader));
-                    tais.getNextEntry();
-                    return new TarArchiveInputStream(in);
+                    tais = new TarArchiveInputStream(new ByteArrayInputStream(tarheader));
+                    // COMPRESS-191 - verify the header checksum
+                    if (tais.getNextTarEntry().isCheckSumOK()) {
+                        return new TarArchiveInputStream(in);
+                    }
                 } catch (Exception e) { // NOPMD
                     // can generate IllegalArgumentException as well
                     // as IOException
                     // autodetection, simply not a TAR
                     // ignored
+                } finally {
+                    if (tais != null) {
+                        try {
+                            tais.close();
+                        } catch (IOException ignored) {
+                            // ignored
+                        }
+                    }
                 }
             }
         } catch (IOException e) {
@@ -255,4 +316,5 @@ public class ArchiveStreamFactory {
 
         throw new ArchiveException("No Archiver found for the stream signature");
     }
+
 }

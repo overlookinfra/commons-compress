@@ -26,6 +26,8 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.zip.ZipEntry;
+
 import junit.framework.TestCase;
 
 public class ZipFileTest extends TestCase {
@@ -111,7 +113,7 @@ public class ZipFileTest extends TestCase {
             o = new FileOutputStream(f);
             ZipArchiveOutputStream zo = new ZipArchiveOutputStream(o);
             ZipArchiveEntry ze = new ZipArchiveEntry("foo");
-            ze.setMethod(ZipArchiveEntry.STORED);
+            ze.setMethod(ZipEntry.STORED);
             ze.setSize(4);
             ze.setCrc(0xb63cfbcdl);
             zo.putArchiveEntry(ze);
@@ -137,6 +139,30 @@ public class ZipFileTest extends TestCase {
             }
             f.delete();
         }
+    }
+
+    /**
+     * @see "https://issues.apache.org/jira/browse/COMPRESS-176"
+     */
+    public void testWinzipBackSlashWorkaround() throws Exception {
+        URL zip = getClass().getResource("/test-winzip.zip");
+        File archive = new File(new URI(zip.toString()));
+        zf = new ZipFile(archive);
+        assertNull(zf.getEntry("\u00e4\\\u00fc.txt"));
+        assertNotNull(zf.getEntry("\u00e4/\u00fc.txt"));
+    }
+
+    /**
+     * Test case for 
+     * <a href="https://issues.apache.org/jira/browse/COMPRESS-208"
+     * >COMPRESS-208</a>.
+     */
+    public void testSkipsPK00Prefix() throws Exception {
+        URL zip = getClass().getResource("/COMPRESS-208.zip");
+        File archive = new File(new URI(zip.toString()));
+        zf = new ZipFile(archive);
+        assertNotNull(zf.getEntry("test1.xml"));
+        assertNotNull(zf.getEntry("test2.xml"));
     }
 
     /*

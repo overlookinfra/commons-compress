@@ -49,7 +49,7 @@ import org.apache.commons.compress.archivers.ArchiveEntry;
  * @NotThreadSafe
  */
 public class ZipArchiveEntry extends java.util.zip.ZipEntry
-    implements ArchiveEntry, Cloneable {
+    implements ArchiveEntry {
 
     public static final int PLATFORM_UNIX = 3;
     public static final int PLATFORM_FAT  = 0;
@@ -184,7 +184,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      *
      * @return compression method
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     @Override
     public int getMethod() {
@@ -196,7 +196,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      *
      * @param method compression method
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     @Override
     public void setMethod(int method) {
@@ -270,7 +270,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      * by&quot; part of the central file header.
      *
      * @return PLATFORM_FAT unless {@link #setUnixMode setUnixMode}
-     * has been called, in which case PLATORM_UNIX will be returned.
+     * has been called, in which case PLATFORM_UNIX will be returned.
      */
     public int getPlatform() {
         return platform;
@@ -290,11 +290,11 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      */
     public void setExtraFields(ZipExtraField[] fields) {
         extraFields = new LinkedHashMap<ZipShort, ZipExtraField>();
-        for (int i = 0; i < fields.length; i++) {
-            if (fields[i] instanceof UnparseableExtraFieldData) {
-                unparseableExtra = (UnparseableExtraFieldData) fields[i];
+        for (ZipExtraField field : fields) {
+            if (field instanceof UnparseableExtraFieldData) {
+                unparseableExtra = (UnparseableExtraFieldData) field;
             } else {
-                extraFields.put(fields[i].getHeaderId(), fields[i]);
+                extraFields.put(field.getHeaderId(), field);
             }
         }
         setExtra();
@@ -315,7 +315,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      * exists.
      * @return an array of the extra fields
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public ZipExtraField[] getExtraFields(boolean includeUnparseable) {
         if (extraFields == null) {
@@ -390,7 +390,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
     /**
      * Removes unparseable extra field data.
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public void removeUnparseableExtraFieldData() {
         if (unparseableExtra == null) {
@@ -417,7 +417,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      *
      * @return null if no such field exists.
      *
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public UnparseableExtraFieldData getUnparseableExtraFieldData() {
         return unparseableExtra;
@@ -509,6 +509,10 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      * @param name the name to use
      */
     protected void setName(String name) {
+        if (name != null && getPlatform() == PLATFORM_FAT
+            && name.indexOf("/") == -1) {
+            name = name.replace('\\', '/');
+        }
         this.name = name;
     }
 
@@ -542,7 +546,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      * the guessed or configured encoding
      * @param rawName the bytes originally read as name from the
      * archive
-     * @since Apache Commons Compress 1.2
+     * @since 1.2
      */
     protected void setName(String name, byte[] rawName) {
         setName(name);
@@ -556,7 +560,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
      * <p>This method will return null if this instance has not been
      * read from an archive.</p>
      *
-     * @since Apache Commons Compress 1.2
+     * @since 1.2
      */
     public byte[] getRawName() {
         if (rawName != null) {
@@ -583,7 +587,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
 
     /**
      * The "general purpose bit" field.
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public GeneralPurposeBit getGeneralPurposeBit() {
         return gpb;
@@ -591,7 +595,7 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
 
     /**
      * The "general purpose bit" field.
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public void setGeneralPurposeBit(GeneralPurposeBit b) {
         gpb = b;
@@ -610,21 +614,21 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
         if (extraFields == null) {
             setExtraFields(f);
         } else {
-            for (int i = 0; i < f.length; i++) {
+            for (ZipExtraField element : f) {
                 ZipExtraField existing;
-                if (f[i] instanceof UnparseableExtraFieldData) {
+                if (element instanceof UnparseableExtraFieldData) {
                     existing = unparseableExtra;
                 } else {
-                    existing = getExtraField(f[i].getHeaderId());
+                    existing = getExtraField(element.getHeaderId());
                 }
                 if (existing == null) {
-                    addExtraField(f[i]);
+                    addExtraField(element);
                 } else {
                     if (local) {
-                        byte[] b = f[i].getLocalFileDataData();
+                        byte[] b = element.getLocalFileDataData();
                         existing.parseFromLocalFileData(b, 0, b.length);
                     } else {
-                        byte[] b = f[i].getCentralDirectoryData();
+                        byte[] b = element.getCentralDirectoryData();
                         existing.parseFromCentralDirectoryData(b, 0, b.length);
                     }
                 }
@@ -662,13 +666,13 @@ public class ZipArchiveEntry extends java.util.zip.ZipEntry
         String myComment = getComment();
         String otherComment = other.getComment();
         if (myComment == null) {
-            if (otherComment != null) {
-                return false;
-            }
-        } else if (!myComment.equals(otherComment)) {
-            return false;
+            myComment = "";
+        }
+        if (otherComment == null) {
+            otherComment = "";
         }
         return getTime() == other.getTime()
+            && myComment.equals(otherComment)
             && getInternalAttributes() == other.getInternalAttributes()
             && getPlatform() == other.getPlatform()
             && getExternalAttributes() == other.getExternalAttributes()

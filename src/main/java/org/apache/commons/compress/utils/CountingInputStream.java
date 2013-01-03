@@ -24,7 +24,7 @@ import java.io.InputStream;
 
 /**
  * Stream that tracks the number of bytes read.
- * @since Apache Commons Compress 1.3
+ * @since 1.3
  * @NotThreadSafe
  */
 public class CountingInputStream extends FilterInputStream {
@@ -65,7 +65,7 @@ public class CountingInputStream extends FilterInputStream {
             bytesRead += read;
         }
     }
-    
+
     /**
      * Returns the current number of bytes read from this stream.
      * @return the number of read bytes

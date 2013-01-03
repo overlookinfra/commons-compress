@@ -24,7 +24,7 @@ import java.io.OutputStream;
 
 /**
  * Stream that tracks the number of bytes read.
- * @since Apache Commons Compress 1.3
+ * @since 1.3
  * @NotThreadSafe
  */
 public class CountingOutputStream extends FilterOutputStream {
@@ -60,7 +60,7 @@ public class CountingOutputStream extends FilterOutputStream {
             bytesWritten += written;
         }
     }
-    
+
     /**
      * Returns the current number of bytes written to this stream.
      * @return the number of written bytes

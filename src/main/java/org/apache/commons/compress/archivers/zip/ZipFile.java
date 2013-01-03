@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 
 import static org.apache.commons.compress.archivers.zip.ZipConstants.DWORD;
@@ -53,7 +54,7 @@ import static org.apache.commons.compress.archivers.zip.ZipConstants.ZIP64_MAGIC
  * have to reimplement all methods anyway.  Like
  * <code>java.util.ZipFile</code>, it uses RandomAccessFile under the
  * covers and supports compressed and uncompressed entries.  As of
- * Apache Commons Compress it also transparently supports Zip64
+ * Apache Commons Compress 1.3 it also transparently supports Zip64
  * extensions and thus individual entries and archives larger than 4
  * GB or with more than 65536 entries.</p>
  *
@@ -285,11 +286,11 @@ public class ZipFile {
     }
 
     /**
-     * Returns a named entry - or <code>null</code> if no entry by
+     * Returns a named entry - or {@code null} if no entry by
      * that name exists.
      * @param name name of the entry.
      * @return the ZipArchiveEntry corresponding to the given name - or
-     * <code>null</code> if not present.
+     * {@code null} if not present.
      */
     public ZipArchiveEntry getEntry(String name) {
         return nameMap.get(name);
@@ -300,7 +301,7 @@ public class ZipFile {
      *
      * <p>May return false if it is set up to use encryption or a
      * compression method that hasn't been implemented yet.</p>
-     * @since Apache Commons Compress 1.1
+     * @since 1.1
      */
     public boolean canReadEntryData(ZipArchiveEntry ze) {
         return ZipUtil.canHandleEntryData(ze);
@@ -311,7 +312,7 @@ public class ZipFile {
      *
      * @param ze the entry to get the stream for.
      * @return a stream to read the entry from.
-     * @throws IOException if unable to create an input stream from the zipenty
+     * @throws IOException if unable to create an input stream from the zipentry
      * @throws ZipException if the zipentry uses an unsupported feature
      */
     public InputStream getInputStream(ZipArchiveEntry ze)
@@ -325,9 +326,9 @@ public class ZipFile {
         BoundedInputStream bis =
             new BoundedInputStream(start, ze.getCompressedSize());
         switch (ze.getMethod()) {
-            case ZipArchiveEntry.STORED:
+            case ZipEntry.STORED:
                 return bis;
-            case ZipArchiveEntry.DEFLATED:
+            case ZipEntry.DEFLATED:
                 bis.addDummy();
                 final Inflater inflater = new Inflater(true);
                 return new InflaterInputStream(bis, inflater) {
@@ -808,8 +809,9 @@ public class ZipFile {
         Map<ZipArchiveEntry, OffsetEntry> origMap =
             new LinkedHashMap<ZipArchiveEntry, OffsetEntry>(entries);
         entries.clear();
-        for (ZipArchiveEntry ze : origMap.keySet()) {
-            OffsetEntry offsetEntry = origMap.get(ze);
+        for (Map.Entry<ZipArchiveEntry, OffsetEntry> ent : origMap.entrySet()) {
+            ZipArchiveEntry ze = ent.getKey();
+            OffsetEntry offsetEntry = ent.getValue();
             long offset = offsetEntry.headerOffset;
             archive.seek(offset + LFH_OFFSET_FOR_FILENAME_LENGTH);
             byte[] b = new byte[SHORT];
@@ -951,8 +953,9 @@ public class ZipFile {
     private final Comparator<ZipArchiveEntry> OFFSET_COMPARATOR =
         new Comparator<ZipArchiveEntry>() {
         public int compare(ZipArchiveEntry e1, ZipArchiveEntry e2) {
-            if (e1 == e2)
+            if (e1 == e2) {
                 return 0;
+            }
 
             OffsetEntry off1 = entries.get(e1);
             OffsetEntry off2 = entries.get(e2);
