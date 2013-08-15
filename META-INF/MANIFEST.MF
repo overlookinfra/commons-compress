@@ -36,4 +36,5 @@ Bundle-DocURL: http://commons.apache.org/compress/
 Include-Resource: META-INF/LICENSE.txt=LICENSE.txt,META-INF/NOTICE.txt
  =NOTICE.txt
 Bundle-SymbolicName: org.apache.commons.compress
-Bundle-RequiredExecutionEnvironment: J2SE-1.5
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6,
+ J2SE-1.5
